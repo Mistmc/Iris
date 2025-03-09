@@ -21,6 +21,7 @@ package com.volmit.iris.core.commands;
 import com.volmit.iris.Iris;
 import com.volmit.iris.core.IrisSettings;
 import com.volmit.iris.core.loader.IrisData;
+import com.volmit.iris.core.nms.INMS;
 import com.volmit.iris.core.pregenerator.ChunkUpdater;
 import com.volmit.iris.core.service.StudioSVC;
 import com.volmit.iris.core.tools.IrisBenchmarking;
@@ -265,6 +266,17 @@ public class CommandIris implements DecreeExecutor {
             return;
         }
         sender().sendMessage(C.GREEN + "Removing world: " + world.getName());
+
+        if (!IrisToolbelt.evacuate(world)) {
+            sender().sendMessage(C.RED + "Failed to evacuate world: " + world.getName());
+            return;
+        }
+
+        if (!Bukkit.unloadWorld(world, false)) {
+            sender().sendMessage(C.RED + "Failed to unload world: " + world.getName());
+            return;
+        }
+
         try {
             if (IrisToolbelt.removeWorld(world)) {
                 sender().sendMessage(C.GREEN + "Successfully removed " + world.getName() + " from bukkit.yml");
@@ -277,27 +289,32 @@ public class CommandIris implements DecreeExecutor {
         }
         IrisToolbelt.evacuate(world, "Deleting world");
         deletingWorld = true;
-        Bukkit.unloadWorld(world, false);
-        int retries = 12;
-        if (delete) {
+        if (!delete) {
+            deletingWorld = false;
+            return;
+        }
+        VolmitSender sender = sender();
+        J.a(() -> {
+            int retries = 12;
+
             if (deleteDirectory(world.getWorldFolder())) {
-                sender().sendMessage(C.GREEN + "Successfully removed world folder");
+                sender.sendMessage(C.GREEN + "Successfully removed world folder");
             } else {
                 while(true){
                     if (deleteDirectory(world.getWorldFolder())){
-                        sender().sendMessage(C.GREEN + "Successfully removed world folder");
+                        sender.sendMessage(C.GREEN + "Successfully removed world folder");
                         break;
                     }
                     retries--;
                     if (retries == 0){
-                        sender().sendMessage(C.RED + "Failed to remove world folder");
+                        sender.sendMessage(C.RED + "Failed to remove world folder");
                         break;
                     }
                     J.sleep(3000);
                 }
             }
-        }
-        deletingWorld = false;
+            deletingWorld = false;
+        });
     }
 
     public static boolean deleteDirectory(File dir) {
@@ -396,7 +413,7 @@ public class CommandIris implements DecreeExecutor {
     ) {
         sender().sendMessage(C.GREEN + "Downloading pack: " + pack + "/" + branch + (trim ? " trimmed" : "") + (overwrite ? " overwriting" : ""));
         if (pack.equals("overworld")) {
-            String url = "https://github.com/IrisDimensions/overworld/releases/download/" + Iris.OVERWORLD_TAG + "/overworld.zip";
+            String url = "https://github.com/IrisDimensions/overworld/releases/download/" + INMS.OVERWORLD_TAG + "/overworld.zip";
             Iris.service(StudioSVC.class).downloadRelease(sender(), url, trim, overwrite);
         } else {
             Iris.service(StudioSVC.class).downloadSearch(sender(), "IrisDimensions/" + pack + "/" + branch, trim, overwrite);
